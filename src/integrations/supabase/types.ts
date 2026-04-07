@@ -14,7 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      coupons: {
+        Row: {
+          coupon_code: string
+          created_at: string
+          id: string
+          redeemed: boolean
+          student_id: string
+        }
+        Insert: {
+          coupon_code: string
+          created_at?: string
+          id?: string
+          redeemed?: boolean
+          student_id: string
+        }
+        Update: {
+          coupon_code?: string
+          created_at?: string
+          id?: string
+          redeemed?: boolean
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupons_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_locations: {
+        Row: {
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          name?: string
+        }
+        Relationships: []
+      }
+      student_locations: {
+        Row: {
+          id: string
+          latitude: number
+          longitude: number
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          latitude: number
+          longitude: number
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          latitude?: number
+          longitude?: number
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_locations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          barcode_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          barcode_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          barcode_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
