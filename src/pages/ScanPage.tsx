@@ -33,6 +33,7 @@ const ScanPage = () => {
   const [scanning, setScanning] = useState(false);
   const [totalScans, setTotalScans] = useState(0);
   const [phonelessCount, setPhonelessCount] = useState(0);
+  const [scanFlash, setScanFlash] = useState<"green" | "red" | null>(null);
   const [scanResult, setScanResult] = useState<{
     status: "away" | "nearby" | "unavailable" | null;
     studentName?: string;
@@ -41,6 +42,7 @@ const ScanPage = () => {
   }>({ status: null });
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<any>(null);
+  const checkStudentRef = useRef<(barcodeId: string) => Promise<void>>();
 
   // Check sessionStorage for saved event
   useEffect(() => {
@@ -121,6 +123,8 @@ const ScanPage = () => {
 
     if (!student) {
       toast.error("Student not found with ID: " + barcodeId);
+      setScanFlash("red");
+      setTimeout(() => setScanFlash(null), 2000);
       setScanResult({ status: null });
       return;
     }
@@ -140,6 +144,10 @@ const ScanPage = () => {
       );
       result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
     }
+
+    // Flash green or red
+    setScanFlash(result === "away" ? "green" : "red");
+    setTimeout(() => setScanFlash(null), 3000);
 
     await supabase.from("scan_logs").insert({
       event_id: event.id,
@@ -165,20 +173,38 @@ const ScanPage = () => {
     setManualBarcode("");
   };
 
+  // Keep ref in sync so the scanner callback always has fresh state
+  useEffect(() => {
+    checkStudentRef.current = checkStudent;
+  });
+
   const startScanner = async () => {
     setScanning(true);
     setScanResult({ status: null });
+    setScanFlash(null);
     try {
-      const { Html5Qrcode } = await import("html5-qrcode");
-      const scanner = new Html5Qrcode("barcode-reader");
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+      const scanner = new Html5Qrcode("barcode-reader", {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODABAR,
+          Html5QrcodeSupportedFormats.QR_CODE,
+        ],
+      });
       html5QrCodeRef.current = scanner;
       await scanner.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 150 } },
+        { fps: 15, qrbox: { width: 280, height: 120 }, aspectRatio: 1.777 },
         (decodedText: string) => {
           scanner.stop().then(() => {
             setScanning(false);
-            checkStudent(decodedText);
+            checkStudentRef.current?.(decodedText);
           });
         },
         () => {}
@@ -259,7 +285,20 @@ const ScanPage = () => {
             <CardDescription className="text-center">Scan student ID barcode</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div id="barcode-reader" ref={scannerRef} className="overflow-hidden rounded-lg" />
+            <div className="relative overflow-hidden rounded-lg">
+              <div id="barcode-reader" ref={scannerRef} />
+              {scanFlash && (
+                <div
+                  className={`absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-300 ${
+                    scanFlash === "green"
+                      ? "bg-green-500/30 border-4 border-green-500"
+                      : "bg-red-500/30 border-4 border-red-500"
+                  } rounded-lg`}
+                >
+                  <span className="text-5xl">{scanFlash === "green" ? "✅" : "❌"}</span>
+                </div>
+              )}
+            </div>
             {!scanning ? (
               <Button className="w-full" onClick={startScanner}>
                 <Camera className="mr-2 h-4 w-4" /> Start Camera Scanner
