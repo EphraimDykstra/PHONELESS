@@ -32,6 +32,7 @@ const ScanPage = () => {
   const [totalScans, setTotalScans] = useState(0);
   const [phonelessCount, setPhonelessCount] = useState(0);
   const [scanFlash, setScanFlash] = useState<"green" | "red" | null>(null);
+  const [scanHint, setScanHint] = useState("Align the full barcode inside the frame");
   const [scanResult, setScanResult] = useState<{
     status: "away" | "nearby" | "unavailable" | null;
     studentName?: string;
@@ -41,6 +42,13 @@ const ScanPage = () => {
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<any>(null);
   const checkStudentRef = useRef<(barcodeId: string) => Promise<void>>();
+
+  const normalizeBarcode = (value: string) => value.replace(/\D/g, "");
+  const buildBarcodeCandidates = (value: string) => {
+    const normalized = normalizeBarcode(value);
+    const withoutLeadingZeros = normalized.replace(/^0+/, "");
+    return Array.from(new Set([value.trim(), normalized, withoutLeadingZeros].filter(Boolean)));
+  };
 
   // Check sessionStorage for saved event
   useEffect(() => {
@@ -116,11 +124,23 @@ const ScanPage = () => {
       return;
     }
 
-    const { data: student } = await supabase.from("students")
-      .select("*").eq("barcode_id", barcodeId.trim()).single();
+    const candidates = buildBarcodeCandidates(barcodeId);
+    let student: { id: string; name: string; barcode_id: string } | null = null;
+
+    for (const candidate of candidates) {
+      const { data } = await supabase.from("students")
+        .select("*")
+        .eq("barcode_id", candidate)
+        .maybeSingle();
+      if (data) {
+        student = data;
+        break;
+      }
+    }
 
     if (!student) {
-      toast.error("Student not found with ID: " + barcodeId);
+      toast.error("Student not found with ID: " + candidates[0]);
+      setScanHint(`Read ${candidates[0]} but no student matched`);
       setScanFlash("red");
       setTimeout(() => setScanFlash(null), 2000);
       setScanResult({ status: null });
@@ -128,7 +148,9 @@ const ScanPage = () => {
     }
 
     const { data: loc } = await supabase.from("student_locations")
-      .select("*").eq("student_id", student.id).single();
+      .select("*")
+      .eq("student_id", student.id)
+      .single();
 
     let result: "away" | "nearby" | "unavailable";
     let distance: number | undefined;
@@ -137,14 +159,16 @@ const ScanPage = () => {
       result = "unavailable";
     } else {
       distance = calculateDistanceFeet(
-        eventLocation.latitude, eventLocation.longitude,
-        loc.latitude, loc.longitude
+        eventLocation.latitude,
+        eventLocation.longitude,
+        loc.latitude,
+        loc.longitude
       );
       result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
     }
 
-    // Flash green or red
     setScanFlash(result === "away" ? "green" : "red");
+    setScanHint(`Read ${student.barcode_id}`);
     setTimeout(() => setScanFlash(null), 3000);
 
     await supabase.from("scan_logs").insert({
@@ -171,7 +195,6 @@ const ScanPage = () => {
     setManualBarcode("");
   };
 
-  // Keep ref in sync so the scanner callback always has fresh state
   useEffect(() => {
     checkStudentRef.current = checkStudent;
   });
@@ -180,6 +203,8 @@ const ScanPage = () => {
     setScanning(true);
     setScanResult({ status: null });
     setScanFlash(null);
+    setScanHint("Starting camera…");
+
     try {
       const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
       const scanner = new Html5Qrcode("barcode-reader", {
@@ -193,32 +218,57 @@ const ScanPage = () => {
           Html5QrcodeSupportedFormats.UPC_E,
           Html5QrcodeSupportedFormats.CODABAR,
         ],
+        useBarCodeDetectorIfSupported: true,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         verbose: false,
       } as any);
+
       html5QrCodeRef.current = scanner;
       await scanner.start(
-        { facingMode: "environment" },
         {
-          fps: 15,
-          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-            // Use most of the camera width so long barcodes like ITF fit
-            const width = Math.floor(viewfinderWidth * 0.9);
-            const height = Math.floor(viewfinderHeight * 0.25);
-            return { width: Math.max(width, 250), height: Math.max(height, 80) };
-          },
+          facingMode: { ideal: "environment" },
+          advanced: [{ focusMode: "continuous" as any }, { zoom: 2 as any }],
+        },
+        {
+          fps: 20,
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
+            width: Math.max(Math.floor(viewfinderWidth * 0.94), 280),
+            height: Math.max(Math.floor(viewfinderHeight * 0.22), 90),
+          }),
           aspectRatio: 1.777,
           disableFlip: false,
+          videoConstraints: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         },
-        (decodedText: string) => {
-          scanner.stop().then(() => {
-            setScanning(false);
-            checkStudentRef.current?.(decodedText);
-          });
+        async (decodedText: string) => {
+          setScanHint(`Barcode detected: ${decodedText}`);
+          await scanner.stop();
+          setScanning(false);
+          await checkStudentRef.current?.(decodedText);
         },
         () => {}
       );
+
+      setScanHint("Hold the full barcode horizontally inside the frame");
+
+      try {
+        const capabilities = scanner.getRunningTrackCapabilities();
+        const constraints: MediaTrackConstraints = {
+          advanced: [
+            capabilities.zoom ? { zoom: Math.min(2, capabilities.zoom.max || 2) } : {},
+            capabilities.torch ? { torch: false } : {},
+          ],
+        };
+        await scanner.applyVideoConstraints(constraints);
+      } catch {
+        // Some iPhones don't expose these capabilities; scanning can still work.
+      }
     } catch {
-      toast.error("Camera access denied. In Safari, go to Settings > Safari > Camera and set to Allow.");
+      toast.error("Camera access denied or barcode reader failed to start in Safari.");
+      setScanHint("Camera could not start");
       setScanning(false);
     }
   };
@@ -307,6 +357,7 @@ const ScanPage = () => {
                 </div>
               )}
             </div>
+            <p className="text-center text-xs text-muted-foreground">{scanHint}</p>
             {!scanning ? (
               <Button className="w-full" onClick={startScanner}>
                 <Camera className="mr-2 h-4 w-4" /> Start Camera Scanner
