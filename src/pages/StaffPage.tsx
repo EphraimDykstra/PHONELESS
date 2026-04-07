@@ -220,7 +220,7 @@ const StaffPage = () => {
         )}
 
         {scanResult.status === "unavailable" && (
-          <Card className="border-yellow-500">
+          <Card className="border-destructive/50">
             <CardContent className="pt-6 text-center">
               <p className="text-3xl">⚠️</p>
               <p className="mt-2 text-lg font-semibold">Location unavailable</p>
