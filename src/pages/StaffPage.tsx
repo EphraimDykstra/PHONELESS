@@ -16,6 +16,8 @@ interface EventInfo {
   id: string;
   name: string;
   coupon_reward: string;
+  coupon_text: string;
+  coupon_image_url: string | null;
   latitude: number | null;
   longitude: number | null;
 }
@@ -235,6 +237,9 @@ const StaffPage = () => {
             couponCode={scanResult.couponCode!}
             distance={scanResult.distance!}
             rewardText={event.coupon_reward}
+            eventName={event.name}
+            couponText={event.coupon_text}
+            couponImageUrl={event.coupon_image_url}
           />
         )}
 
