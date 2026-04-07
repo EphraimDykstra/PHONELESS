@@ -184,22 +184,31 @@ const ScanPage = () => {
       const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
       const scanner = new Html5Qrcode("barcode-reader", {
         formatsToSupport: [
+          Html5QrcodeSupportedFormats.ITF,
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
           Html5QrcodeSupportedFormats.EAN_13,
           Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.UPC_A,
           Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.ITF,
           Html5QrcodeSupportedFormats.CODABAR,
-          Html5QrcodeSupportedFormats.QR_CODE,
         ],
         verbose: false,
       } as any);
       html5QrCodeRef.current = scanner;
       await scanner.start(
         { facingMode: "environment" },
-        { fps: 15, qrbox: { width: 280, height: 120 }, aspectRatio: 1.777 },
+        {
+          fps: 15,
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            // Use most of the camera width so long barcodes like ITF fit
+            const width = Math.floor(viewfinderWidth * 0.9);
+            const height = Math.floor(viewfinderHeight * 0.25);
+            return { width: Math.max(width, 250), height: Math.max(height, 80) };
+          },
+          aspectRatio: 1.777,
+          disableFlip: false,
+        },
         (decodedText: string) => {
           scanner.stop().then(() => {
             setScanning(false);
