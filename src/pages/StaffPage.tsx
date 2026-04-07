@@ -111,7 +111,7 @@ const StaffPage = () => {
         },
         () => {}
       );
-    } catch (err) {
+    } catch {
       toast.error("Camera access denied or not available");
       setScanning(false);
     }
