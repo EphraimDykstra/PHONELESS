@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, Cookie } from "lucide-react";
+import { ArrowLeft, MapPin, CalendarDays } from "lucide-react";
 
 const StudentPage = () => {
   const navigate = useNavigate();
@@ -16,10 +16,11 @@ const StudentPage = () => {
   const [barcodeId, setBarcodeId] = useState("");
   const [student, setStudent] = useState<{ id: string; name: string; barcode_id: string } | null>(null);
   const [locationSharing, setLocationSharing] = useState(false);
-  const [coupons, setCoupons] = useState<{ coupon_code: string; created_at: string; redeemed: boolean }[]>([]);
+  const [eventsAttended, setEventsAttended] = useState<
+    { event_name: string; coupon_code: string; coupon_reward: string; created_at: string; redeemed: boolean }[]
+  >([]);
   const [registering, setRegistering] = useState(false);
 
-  // Check localStorage for saved student
   useEffect(() => {
     const savedId = localStorage.getItem("student_id");
     if (savedId) {
@@ -29,16 +30,46 @@ const StudentPage = () => {
     }
   }, []);
 
-  // Fetch coupons
+  // Fetch events attended via coupons (each coupon links to an event)
   useEffect(() => {
     if (!student) return;
-    supabase.from("coupons").select("coupon_code, created_at, redeemed").eq("student_id", student.id)
-      .order("created_at", { ascending: false }).then(({ data }) => {
-        if (data) setCoupons(data);
-      });
+    const fetchEvents = async () => {
+      const { data: coupons } = await supabase
+        .from("coupons")
+        .select("coupon_code, created_at, redeemed, event_id")
+        .eq("student_id", student.id)
+        .order("created_at", { ascending: false });
+
+      if (!coupons || coupons.length === 0) {
+        setEventsAttended([]);
+        return;
+      }
+
+      // Fetch event details for each coupon
+      const eventIds = [...new Set(coupons.map((c) => c.event_id).filter(Boolean))];
+      const { data: events } = await supabase
+        .from("events")
+        .select("id, name, coupon_reward")
+        .in("id", eventIds);
+
+      const eventMap = new Map(events?.map((e) => [e.id, e]) || []);
+
+      setEventsAttended(
+        coupons.map((c) => {
+          const event = c.event_id ? eventMap.get(c.event_id) : null;
+          return {
+            event_name: event?.name || "Event",
+            coupon_code: c.coupon_code,
+            coupon_reward: event?.coupon_reward || "Complimentary Snack",
+            created_at: c.created_at,
+            redeemed: c.redeemed,
+          };
+        })
+      );
+    };
+    fetchEvents();
   }, [student]);
 
-  // Location sharing
   const updateLocation = useCallback(async () => {
     if (!student || !locationSharing) return;
     try {
@@ -51,7 +82,7 @@ const StudentPage = () => {
         { onConflict: "student_id" }
       );
     } catch {
-      toast.error("Could not get location. Please enable GPS.");
+      toast.error("Could not get location. Please enable GPS in your browser settings.");
       setLocationSharing(false);
     }
   }, [student, locationSharing]);
@@ -74,7 +105,6 @@ const StudentPage = () => {
       .select().single();
     if (error) {
       if (error.code === "23505") {
-        // Already registered, look them up
         const { data: existing } = await supabase.from("students")
           .select("*").eq("barcode_id", barcodeId.trim()).single();
         if (existing) {
@@ -162,25 +192,29 @@ const StudentPage = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Cookie className="h-5 w-5" /> Your Coupons
+              <CalendarDays className="h-5 w-5" /> Events Attended
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {coupons.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No coupons yet. Put your phone away to earn snacks!</p>
+            {eventsAttended.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No events yet. Put your phone away at an event to earn snacks!</p>
             ) : (
-              <div className="space-y-2">
-                {coupons.map((c) => (
-                  <div key={c.coupon_code} className="flex items-center justify-between rounded-md border px-3 py-2">
-                    <div>
-                      <p className="font-mono text-sm font-semibold">{c.coupon_code}</p>
+              <div className="space-y-3">
+                {eventsAttended.map((e, i) => (
+                  <div key={i} className="rounded-lg border p-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-sm text-foreground">{e.event_name}</p>
+                      <Badge variant={e.redeemed ? "secondary" : "default"}>
+                        {e.redeemed ? "Redeemed" : "Valid"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">🎁 {e.coupon_reward}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-mono text-xs text-muted-foreground">{e.coupon_code}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(c.created_at).toLocaleDateString()}
+                        {new Date(e.created_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <Badge variant={c.redeemed ? "secondary" : "default"}>
-                      {c.redeemed ? "Used" : "Valid"}
-                    </Badge>
                   </div>
                 ))}
               </div>
