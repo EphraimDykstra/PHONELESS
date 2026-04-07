@@ -6,11 +6,11 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, MapPin } from "lucide-react";
+import { ArrowLeft, Camera, MapPin, Users, Smartphone, Hash } from "lucide-react";
 import { calculateDistanceFeet, generateCouponCode } from "@/lib/distance";
 import CouponPrint from "@/components/CouponPrint";
 
-const DISTANCE_THRESHOLD = 500; // feet
+const DISTANCE_THRESHOLD = 500;
 
 interface EventInfo {
   id: string;
@@ -22,13 +22,17 @@ interface EventInfo {
   longitude: number | null;
 }
 
-const StaffPage = () => {
+const ScanPage = () => {
   const navigate = useNavigate();
+  const [accessCode, setAccessCode] = useState("");
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [eventLocation, setEventLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [settingLocation, setSettingLocation] = useState(false);
   const [manualBarcode, setManualBarcode] = useState("");
+  const [showManualEntry, setShowManualEntry] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [totalScans, setTotalScans] = useState(0);
+  const [phonelessCount, setPhonelessCount] = useState(0);
   const [scanResult, setScanResult] = useState<{
     status: "away" | "nearby" | "unavailable" | null;
     studentName?: string;
@@ -38,7 +42,7 @@ const StaffPage = () => {
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<any>(null);
 
-  // Load event from sessionStorage (set during access code entry on Index)
+  // Check sessionStorage for saved event
   useEffect(() => {
     const stored = sessionStorage.getItem("staff_event");
     if (stored) {
@@ -47,10 +51,47 @@ const StaffPage = () => {
       if (ev.latitude && ev.longitude) {
         setEventLocation({ latitude: ev.latitude, longitude: ev.longitude });
       }
-    } else {
-      navigate("/");
     }
-  }, [navigate]);
+  }, []);
+
+  // Load scan stats when event is set
+  useEffect(() => {
+    if (!event) return;
+    const loadStats = async () => {
+      const { count: total } = await supabase
+        .from("scan_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("event_id", event.id);
+      const { count: away } = await supabase
+        .from("scan_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("event_id", event.id)
+        .eq("result", "away");
+      setTotalScans(total || 0);
+      setPhonelessCount(away || 0);
+    };
+    loadStats();
+  }, [event, scanResult]);
+
+  const handleAccessCode = async () => {
+    if (!accessCode.trim()) return;
+    const { data: ev } = await supabase
+      .from("events")
+      .select("*")
+      .eq("access_code", accessCode.toUpperCase().trim())
+      .eq("active", true)
+      .single();
+    if (ev) {
+      sessionStorage.setItem("staff_event", JSON.stringify(ev));
+      setEvent(ev);
+      if (ev.latitude && ev.longitude) {
+        setEventLocation({ latitude: ev.latitude, longitude: ev.longitude });
+      }
+      toast.success("Connected to: " + ev.name);
+    } else {
+      toast.error("Invalid or inactive access code");
+    }
+  };
 
   const setCurrentLocation = async () => {
     if (!event) return;
@@ -100,7 +141,6 @@ const StaffPage = () => {
       result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
     }
 
-    // Log the scan
     await supabase.from("scan_logs").insert({
       event_id: event.id,
       student_id: student.id,
@@ -121,6 +161,8 @@ const StaffPage = () => {
     } else {
       setScanResult({ status: "unavailable", studentName: student.name });
     }
+
+    setManualBarcode("");
   };
 
   const startScanner = async () => {
@@ -154,22 +196,42 @@ const StaffPage = () => {
     setScanning(false);
   };
 
-  if (!event) return null;
+  // Step 1: Enter access code
+  if (!event) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <CardTitle>🔐 Staff Scanner</CardTitle>
+            <CardDescription>Enter your event access code to begin scanning</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              placeholder="Access code (e.g. ABC123)"
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAccessCode()}
+              className="text-center font-mono text-lg uppercase"
+            />
+            <Button className="w-full" onClick={handleAccessCode}>Connect</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
+  // Step 2: Set event location
   if (!eventLocation) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-md space-y-6">
-          <Button variant="ghost" onClick={() => navigate("/")} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Button>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" /> Set Event Location
               </CardTitle>
               <CardDescription>
-                Set your current GPS position as the event location for <strong>{event.name}</strong>. Students whose phones are 500+ feet from here will earn: <strong>{event.coupon_reward}</strong>
+                Set your current GPS position for <strong>{event.name}</strong>. Students whose phones are 500+ feet from here earn: <strong>{event.coupon_reward}</strong>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -186,51 +248,31 @@ const StaffPage = () => {
     );
   }
 
+  // Step 3: Scanner dashboard
   return (
     <div className="flex min-h-screen flex-col bg-background p-4">
-      <div className="mx-auto w-full max-w-md space-y-6">
-        <Button variant="ghost" onClick={() => navigate("/")} className="gap-1">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Button>
-
+      <div className="mx-auto w-full max-w-md space-y-4">
+        {/* Camera scanner at top */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Camera className="h-5 w-5" /> Scan Student ID
-            </CardTitle>
-            <CardDescription>Event: {event.name} • Reward: {event.coupon_reward}</CardDescription>
+            <CardTitle className="text-lg text-center">{event.name}</CardTitle>
+            <CardDescription className="text-center">Scan student ID barcode</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div id="barcode-reader" ref={scannerRef} className="overflow-hidden rounded-lg" />
-            <div className="flex gap-2">
-              {!scanning ? (
-                <Button className="w-full" onClick={startScanner}>
-                  <Camera className="mr-2 h-4 w-4" /> Start Camera Scanner
-                </Button>
-              ) : (
-                <Button className="w-full" variant="destructive" onClick={stopScanner}>
-                  Stop Scanner
-                </Button>
-              )}
-            </div>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">or type manually</span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter student ID"
-                value={manualBarcode}
-                onChange={(e) => setManualBarcode(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && checkStudent(manualBarcode)}
-              />
-              <Button onClick={() => checkStudent(manualBarcode)}>Check</Button>
-            </div>
+            {!scanning ? (
+              <Button className="w-full" onClick={startScanner}>
+                <Camera className="mr-2 h-4 w-4" /> Start Camera Scanner
+              </Button>
+            ) : (
+              <Button className="w-full" variant="destructive" onClick={stopScanner}>
+                Stop Scanner
+              </Button>
+            )}
           </CardContent>
         </Card>
 
+        {/* Scan result */}
         {scanResult.status === "away" && (
           <CouponPrint
             studentName={scanResult.studentName!}
@@ -267,19 +309,63 @@ const StaffPage = () => {
           </Card>
         )}
 
+        {/* Stats tally */}
+        <div className="grid grid-cols-2 gap-3">
+          <Card>
+            <CardContent className="pt-4 pb-4 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
+                <Users className="h-4 w-4" />
+                <span className="text-xs">Students Scanned</span>
+              </div>
+              <p className="text-3xl font-bold text-foreground">{totalScans}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-4 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
+                <Smartphone className="h-4 w-4" />
+                <span className="text-xs">Phone-less ✅</span>
+              </div>
+              <p className="text-3xl font-bold text-foreground">{phonelessCount}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Manual entry */}
         <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground text-center">
-              📍 Event location set ({eventLocation.latitude.toFixed(4)}, {eventLocation.longitude.toFixed(4)})
-              <Button variant="link" className="ml-1 h-auto p-0 text-xs" onClick={() => setEventLocation(null)}>
-                Change
+          <CardContent className="pt-4 pb-4 space-y-3">
+            {!showManualEntry ? (
+              <Button variant="outline" className="w-full gap-2" onClick={() => setShowManualEntry(true)}>
+                <Hash className="h-4 w-4" /> Manual ID Entry
               </Button>
-            </p>
+            ) : (
+              <>
+                <Label className="text-xs text-muted-foreground">Type student ID number</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g. 920145678"
+                    value={manualBarcode}
+                    onChange={(e) => setManualBarcode(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && checkStudent(manualBarcode)}
+                    className="font-mono"
+                  />
+                  <Button onClick={() => checkStudent(manualBarcode)}>Check</Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
+
+        {/* Location info */}
+        <p className="text-xs text-muted-foreground text-center">
+          📍 ({eventLocation.latitude.toFixed(4)}, {eventLocation.longitude.toFixed(4)})
+          <Button variant="link" className="ml-1 h-auto p-0 text-xs" onClick={() => setEventLocation(null)}>
+            Change
+          </Button>
+        </p>
       </div>
     </div>
   );
 };
 
-export default StaffPage;
+export default ScanPage;

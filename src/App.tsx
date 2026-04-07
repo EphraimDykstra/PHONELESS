@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import StudentPage from "./pages/StudentPage.tsx";
-import StaffPage from "./pages/StaffPage.tsx";
+import ScanPage from "./pages/ScanPage.tsx";
 import AdminPage from "./pages/AdminPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -20,7 +20,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/student" element={<StudentPage />} />
-          <Route path="/staff" element={<StaffPage />} />
+          <Route path="/scan" element={<ScanPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
