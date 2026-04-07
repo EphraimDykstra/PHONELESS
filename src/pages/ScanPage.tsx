@@ -227,7 +227,6 @@ const ScanPage = () => {
       await scanner.start(
         {
           facingMode: { ideal: "environment" },
-          advanced: [{ focusMode: "continuous" as any }, { zoom: 2 as any }],
         },
         {
           fps: 20,
@@ -255,13 +254,16 @@ const ScanPage = () => {
       setScanHint("Hold the full barcode horizontally inside the frame");
 
       try {
-        const capabilities = scanner.getRunningTrackCapabilities();
-        const constraints: MediaTrackConstraints = {
-          advanced: [
-            capabilities.zoom ? { zoom: Math.min(2, capabilities.zoom.max || 2) } : {},
-            capabilities.torch ? { torch: false } : {},
-          ],
+        const capabilities = scanner.getRunningTrackCapabilities() as MediaTrackCapabilities & {
+          zoom?: { max?: number };
+          torch?: boolean;
         };
+        const constraints = {
+          advanced: [
+            capabilities.zoom ? ({ zoom: Math.min(2, capabilities.zoom.max || 2) } as unknown as MediaTrackConstraintSet) : {},
+            capabilities.torch ? ({ torch: false } as unknown as MediaTrackConstraintSet) : {},
+          ],
+        } as MediaTrackConstraints;
         await scanner.applyVideoConstraints(constraints);
       } catch {
         // Some iPhones don't expose these capabilities; scanning can still work.
