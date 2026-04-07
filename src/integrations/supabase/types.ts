@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           coupon_code: string
           created_at: string
+          event_id: string | null
           id: string
           redeemed: boolean
           student_id: string
@@ -25,6 +26,7 @@ export type Database = {
         Insert: {
           coupon_code: string
           created_at?: string
+          event_id?: string | null
           id?: string
           redeemed?: boolean
           student_id: string
@@ -32,11 +34,19 @@ export type Database = {
         Update: {
           coupon_code?: string
           created_at?: string
+          event_id?: string | null
           id?: string
           redeemed?: boolean
           student_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "coupons_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "coupons_student_id_fkey"
             columns: ["student_id"]
@@ -69,6 +79,81 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      events: {
+        Row: {
+          access_code: string
+          active: boolean
+          coupon_reward: string
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          name: string
+        }
+        Insert: {
+          access_code: string
+          active?: boolean
+          coupon_reward?: string
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+        }
+        Update: {
+          access_code?: string
+          active?: boolean
+          coupon_reward?: string
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+        }
+        Relationships: []
+      }
+      scan_logs: {
+        Row: {
+          created_at: string
+          distance_feet: number | null
+          event_id: string
+          id: string
+          result: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          distance_feet?: number | null
+          event_id: string
+          id?: string
+          result: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          distance_feet?: number | null
+          event_id?: string
+          id?: string
+          result?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_logs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scan_logs_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_locations: {
         Row: {

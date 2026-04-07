@@ -12,10 +12,18 @@ import CouponPrint from "@/components/CouponPrint";
 
 const DISTANCE_THRESHOLD = 500; // feet
 
+interface EventInfo {
+  id: string;
+  name: string;
+  coupon_reward: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 const StaffPage = () => {
   const navigate = useNavigate();
+  const [event, setEvent] = useState<EventInfo | null>(null);
   const [eventLocation, setEventLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [eventName, setEventName] = useState("");
   const [settingLocation, setSettingLocation] = useState(false);
   const [manualBarcode, setManualBarcode] = useState("");
   const [scanning, setScanning] = useState(false);
@@ -28,36 +36,39 @@ const StaffPage = () => {
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<any>(null);
 
-  // Load saved event location
+  // Load event from sessionStorage (set during access code entry on Index)
   useEffect(() => {
-    supabase.from("event_locations").select("*").order("created_at", { ascending: false }).limit(1)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          setEventLocation({ latitude: data[0].latitude, longitude: data[0].longitude });
-          setEventName(data[0].name);
-        }
-      });
-  }, []);
+    const stored = sessionStorage.getItem("staff_event");
+    if (stored) {
+      const ev = JSON.parse(stored) as EventInfo;
+      setEvent(ev);
+      if (ev.latitude && ev.longitude) {
+        setEventLocation({ latitude: ev.latitude, longitude: ev.longitude });
+      }
+    } else {
+      navigate("/");
+    }
+  }, [navigate]);
 
   const setCurrentLocation = async () => {
+    if (!event) return;
     setSettingLocation(true);
     try {
       const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true })
       );
       const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-      const name = eventName.trim() || "Event";
-      await supabase.from("event_locations").insert({ name, ...loc });
+      await supabase.from("events").update({ latitude: loc.latitude, longitude: loc.longitude }).eq("id", event.id);
       setEventLocation(loc);
       toast.success("Event location set!");
     } catch {
-      toast.error("Could not get location. Please enable GPS.");
+      toast.error("Could not get location. Please allow location access in Safari Settings > Privacy > Location Services.");
     }
     setSettingLocation(false);
   };
 
   const checkStudent = async (barcodeId: string) => {
-    if (!eventLocation) {
+    if (!eventLocation || !event) {
       toast.error("Set the event location first!");
       return;
     }
@@ -74,22 +85,39 @@ const StaffPage = () => {
     const { data: loc } = await supabase.from("student_locations")
       .select("*").eq("student_id", student.id).single();
 
+    let result: "away" | "nearby" | "unavailable";
+    let distance: number | undefined;
+
     if (!loc) {
-      setScanResult({ status: "unavailable", studentName: student.name });
-      return;
+      result = "unavailable";
+    } else {
+      distance = calculateDistanceFeet(
+        eventLocation.latitude, eventLocation.longitude,
+        loc.latitude, loc.longitude
+      );
+      result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
     }
 
-    const distance = calculateDistanceFeet(
-      eventLocation.latitude, eventLocation.longitude,
-      loc.latitude, loc.longitude
-    );
+    // Log the scan
+    await supabase.from("scan_logs").insert({
+      event_id: event.id,
+      student_id: student.id,
+      result,
+      distance_feet: distance ? Math.round(distance) : null,
+    });
 
-    if (distance >= DISTANCE_THRESHOLD) {
+    if (result === "away") {
       const couponCode = generateCouponCode();
-      await supabase.from("coupons").insert({ student_id: student.id, coupon_code: couponCode });
-      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance), couponCode });
+      await supabase.from("coupons").insert({
+        student_id: student.id,
+        coupon_code: couponCode,
+        event_id: event.id,
+      });
+      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode });
+    } else if (result === "nearby") {
+      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!) });
     } else {
-      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance) });
+      setScanResult({ status: "unavailable", studentName: student.name });
     }
   };
 
@@ -112,7 +140,7 @@ const StaffPage = () => {
         () => {}
       );
     } catch {
-      toast.error("Camera access denied or not available");
+      toast.error("Camera access denied. In Safari, go to Settings > Safari > Camera and set to Allow.");
       setScanning(false);
     }
   };
@@ -123,6 +151,8 @@ const StaffPage = () => {
     }
     setScanning(false);
   };
+
+  if (!event) return null;
 
   if (!eventLocation) {
     return (
@@ -137,14 +167,13 @@ const StaffPage = () => {
                 <MapPin className="h-5 w-5" /> Set Event Location
               </CardTitle>
               <CardDescription>
-                Set your current GPS position as the event location. Students whose phones are 500+ feet from here will earn a coupon.
+                Set your current GPS position as the event location for <strong>{event.name}</strong>. Students whose phones are 500+ feet from here will earn: <strong>{event.coupon_reward}</strong>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Event Name</Label>
-                <Input placeholder="e.g. Study Hall" value={eventName} onChange={(e) => setEventName(e.target.value)} />
-              </div>
+              <p className="text-xs text-muted-foreground">
+                ⚠️ On iPhone, make sure Safari has location access: Settings → Privacy → Location Services → Safari → "While Using"
+              </p>
               <Button className="w-full" onClick={setCurrentLocation} disabled={settingLocation}>
                 {settingLocation ? "Getting location..." : "Use My Current Location"}
               </Button>
@@ -167,6 +196,7 @@ const StaffPage = () => {
             <CardTitle className="flex items-center gap-2 text-lg">
               <Camera className="h-5 w-5" /> Scan Student ID
             </CardTitle>
+            <CardDescription>Event: {event.name} • Reward: {event.coupon_reward}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div id="barcode-reader" ref={scannerRef} className="overflow-hidden rounded-lg" />
@@ -204,6 +234,7 @@ const StaffPage = () => {
             studentName={scanResult.studentName!}
             couponCode={scanResult.couponCode!}
             distance={scanResult.distance!}
+            rewardText={event.coupon_reward}
           />
         )}
 

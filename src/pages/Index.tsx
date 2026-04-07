@@ -5,20 +5,31 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Smartphone, ScanLine } from "lucide-react";
 import { toast } from "sonner";
-
-const STAFF_CODE = "SNACK2026";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const navigate = useNavigate();
   const [showStaffInput, setShowStaffInput] = useState(false);
   const [accessCode, setAccessCode] = useState("");
+  const [checking, setChecking] = useState(false);
 
-  const handleStaffAccess = () => {
-    if (accessCode.toUpperCase() === STAFF_CODE) {
+  const handleStaffAccess = async () => {
+    if (!accessCode.trim()) return;
+    setChecking(true);
+    const { data: event } = await supabase
+      .from("events")
+      .select("*")
+      .eq("access_code", accessCode.toUpperCase().trim())
+      .eq("active", true)
+      .single();
+
+    if (event) {
+      sessionStorage.setItem("staff_event", JSON.stringify(event));
       navigate("/staff");
     } else {
-      toast.error("Invalid access code");
+      toast.error("Invalid or inactive access code");
     }
+    setChecking(false);
   };
 
   return (
@@ -65,7 +76,9 @@ const Index = () => {
                     onChange={(e) => setAccessCode(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleStaffAccess()}
                   />
-                  <Button onClick={handleStaffAccess}>Go</Button>
+                  <Button onClick={handleStaffAccess} disabled={checking}>
+                    {checking ? "..." : "Go"}
+                  </Button>
                 </div>
               </CardContent>
             )}

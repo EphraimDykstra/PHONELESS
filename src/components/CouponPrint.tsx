@@ -6,9 +6,10 @@ interface CouponPrintProps {
   studentName: string;
   couponCode: string;
   distance: number;
+  rewardText?: string;
 }
 
-const CouponPrint = ({ studentName, couponCode, distance }: CouponPrintProps) => {
+const CouponPrint = ({ studentName, couponCode, distance, rewardText = "Complimentary Snack" }: CouponPrintProps) => {
   const handlePrint = () => {
     window.print();
   };
@@ -23,7 +24,7 @@ const CouponPrint = ({ studentName, couponCode, distance }: CouponPrintProps) =>
             {studentName}'s phone is {distance} feet away
           </p>
           <div className="rounded-lg border-2 border-dashed border-primary p-4 my-4">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Complimentary Snack Coupon</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">{rewardText} Coupon</p>
             <p className="text-2xl font-bold font-mono mt-1">{couponCode}</p>
             <p className="text-sm font-medium mt-2">{studentName}</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -31,7 +32,7 @@ const CouponPrint = ({ studentName, couponCode, distance }: CouponPrintProps) =>
             </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Present this coupon to redeem one complimentary snack. One per scan.
+            Present this coupon to redeem: {rewardText}. One per scan.
           </p>
         </CardContent>
       </Card>
