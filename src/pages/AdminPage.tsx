@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Copy, Users, ScanLine, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Copy, Users, ScanLine, ToggleLeft, ToggleRight, Upload, Image } from "lucide-react";
 
 const ADMIN_PASSWORD = "password";
 
@@ -15,7 +16,11 @@ const AdminPage = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [newEventName, setNewEventName] = useState("");
   const [newCouponReward, setNewCouponReward] = useState("Complimentary Snack");
+  const [newCouponText, setNewCouponText] = useState("");
+  const [newCouponImage, setNewCouponImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (authenticated) loadEvents();
@@ -35,7 +40,6 @@ const AdminPage = () => {
       .select("*")
       .order("created_at", { ascending: false });
     if (data) {
-      // Load stats for each event
       const eventsWithStats = await Promise.all(
         data.map(async (event) => {
           const { count: scanCount } = await supabase
@@ -64,6 +68,32 @@ const AdminPage = () => {
     return code;
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewCouponImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const ext = file.name.split(".").pop();
+    const fileName = `${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage
+      .from("coupon-images")
+      .upload(fileName, file);
+    if (error) {
+      toast.error("Image upload failed");
+      return null;
+    }
+    const { data: urlData } = supabase.storage
+      .from("coupon-images")
+      .getPublicUrl(fileName);
+    return urlData.publicUrl;
+  };
+
   const createEvent = async () => {
     if (!newEventName.trim()) {
       toast.error("Enter an event name");
@@ -71,10 +101,18 @@ const AdminPage = () => {
     }
     setLoading(true);
     const accessCode = generateAccessCode();
+
+    let imageUrl: string | null = null;
+    if (newCouponImage) {
+      imageUrl = await uploadImage(newCouponImage);
+    }
+
     const { error } = await supabase.from("events").insert({
       name: newEventName.trim(),
       access_code: accessCode,
       coupon_reward: newCouponReward.trim() || "Complimentary Snack",
+      coupon_text: newCouponText.trim(),
+      coupon_image_url: imageUrl,
     });
     if (error) {
       toast.error("Failed to create event");
@@ -82,6 +120,9 @@ const AdminPage = () => {
       toast.success(`Event created! Access code: ${accessCode}`);
       setNewEventName("");
       setNewCouponReward("Complimentary Snack");
+      setNewCouponText("");
+      setNewCouponImage(null);
+      setImagePreview(null);
       loadEvents();
     }
     setLoading(false);
@@ -151,7 +192,44 @@ const AdminPage = () => {
                 value={newCouponReward}
                 onChange={(e) => setNewCouponReward(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">This is what the coupon will say the student receives</p>
+              <p className="text-xs text-muted-foreground">The snack or item the student receives</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Custom Coupon Message (optional)</Label>
+              <Textarea
+                placeholder="e.g. Thank you for staying focused! Enjoy your treat on us."
+                value={newCouponText}
+                onChange={(e) => setNewCouponText(e.target.value)}
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">Extra text printed on the coupon</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Coupon Branding Image (optional)</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  {newCouponImage ? "Change Image" : "Upload Image"}
+                </Button>
+                {imagePreview && (
+                  <div className="relative h-16 w-16 overflow-hidden rounded-lg border">
+                    <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">Logo or snack image shown on the printed coupon</p>
             </div>
             <Button className="w-full" onClick={createEvent} disabled={loading}>
               {loading ? "Creating..." : "Create Event & Generate Access Code"}
@@ -169,9 +247,19 @@ const AdminPage = () => {
             <Card key={event.id} className={!event.active ? "opacity-60" : ""}>
               <CardContent className="pt-6 space-y-4">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold text-foreground">{event.name}</h3>
-                    <p className="text-sm text-muted-foreground">🎁 {event.coupon_reward}</p>
+                  <div className="flex items-start gap-3">
+                    {event.coupon_image_url && (
+                      <div className="h-12 w-12 overflow-hidden rounded-lg border shrink-0">
+                        <img src={event.coupon_image_url} alt="" className="h-full w-full object-cover" />
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-semibold text-foreground">{event.name}</h3>
+                      <p className="text-sm text-muted-foreground">🎁 {event.coupon_reward}</p>
+                      {event.coupon_text && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">"{event.coupon_text}"</p>
+                      )}
+                    </div>
                   </div>
                   <Button
                     variant="ghost"
