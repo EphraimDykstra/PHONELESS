@@ -84,7 +84,9 @@ export type Database = {
         Row: {
           access_code: string
           active: boolean
+          coupon_image_url: string | null
           coupon_reward: string
+          coupon_text: string
           created_at: string
           id: string
           latitude: number | null
@@ -94,7 +96,9 @@ export type Database = {
         Insert: {
           access_code: string
           active?: boolean
+          coupon_image_url?: string | null
           coupon_reward?: string
+          coupon_text?: string
           created_at?: string
           id?: string
           latitude?: number | null
@@ -104,7 +108,9 @@ export type Database = {
         Update: {
           access_code?: string
           active?: boolean
+          coupon_image_url?: string | null
           coupon_reward?: string
+          coupon_text?: string
           created_at?: string
           id?: string
           latitude?: number | null
