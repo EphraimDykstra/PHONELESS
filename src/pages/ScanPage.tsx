@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Camera, MapPin, Users, Smartphone, Hash } from "lucide-react";
+import { Camera, MapPin, Users, Smartphone, Hash } from "lucide-react";
 import { calculateDistanceFeet, generateCouponCode } from "@/lib/distance";
 import CouponPrint from "@/components/CouponPrint";
 
@@ -23,7 +22,6 @@ interface EventInfo {
 }
 
 const ScanPage = () => {
-  const navigate = useNavigate();
   const [accessCode, setAccessCode] = useState("");
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [eventLocation, setEventLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -196,7 +194,8 @@ const ScanPage = () => {
           Html5QrcodeSupportedFormats.CODABAR,
           Html5QrcodeSupportedFormats.QR_CODE,
         ],
-      });
+        verbose: false,
+      } as any);
       html5QrCodeRef.current = scanner;
       await scanner.start(
         { facingMode: "environment" },
