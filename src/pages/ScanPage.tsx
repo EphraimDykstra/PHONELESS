@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -50,7 +49,6 @@ const ScanPage = () => {
     return Array.from(new Set([value.trim(), normalized, withoutLeadingZeros].filter(Boolean)));
   };
 
-  // Check sessionStorage for saved event
   useEffect(() => {
     const stored = sessionStorage.getItem("staff_event");
     if (stored) {
@@ -62,7 +60,6 @@ const ScanPage = () => {
     }
   }, []);
 
-  // Load scan stats when event is set
   useEffect(() => {
     if (!event) return;
     const loadStats = async () => {
@@ -113,7 +110,7 @@ const ScanPage = () => {
       setEventLocation(loc);
       toast.success("Event location set!");
     } catch {
-      toast.error("Could not get location. Please allow location access in Safari Settings > Privacy > Location Services.");
+      toast.error("Could not get location. Allow location access in Safari Settings.");
     }
     setSettingLocation(false);
   };
@@ -140,7 +137,7 @@ const ScanPage = () => {
 
     if (!student) {
       toast.error("Student not found with ID: " + candidates[0]);
-      setScanHint(`Read ${candidates[0]} but no student matched`);
+      setScanHint(`Read ${candidates[0]} — no student matched`);
       setScanFlash("red");
       setTimeout(() => setScanFlash(null), 2000);
       setScanResult({ status: null });
@@ -159,10 +156,8 @@ const ScanPage = () => {
       result = "unavailable";
     } else {
       distance = calculateDistanceFeet(
-        eventLocation.latitude,
-        eventLocation.longitude,
-        loc.latitude,
-        loc.longitude
+        eventLocation.latitude, eventLocation.longitude,
+        loc.latitude, loc.longitude
       );
       result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
     }
@@ -225,9 +220,7 @@ const ScanPage = () => {
 
       html5QrCodeRef.current = scanner;
       await scanner.start(
-        {
-          facingMode: { ideal: "environment" },
-        },
+        { facingMode: { ideal: "environment" } },
         {
           fps: 20,
           qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
@@ -265,11 +258,9 @@ const ScanPage = () => {
           ],
         } as MediaTrackConstraints;
         await scanner.applyVideoConstraints(constraints);
-      } catch {
-        // Some iPhones don't expose these capabilities; scanning can still work.
-      }
+      } catch {}
     } catch {
-      toast.error("Camera access denied or barcode reader failed to start in Safari.");
+      toast.error("Camera access denied or barcode reader failed to start.");
       setScanHint("Camera could not start");
       setScanning(false);
     }
@@ -282,53 +273,50 @@ const ScanPage = () => {
     setScanning(false);
   };
 
-  // Step 1: Enter access code
+  // Step 1: Access code
   if (!event) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader className="text-center">
-            <CardTitle>🔐 Staff Scanner</CardTitle>
-            <CardDescription>Enter your event access code to begin scanning</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Access code (e.g. ABC123)"
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAccessCode()}
-              className="text-center font-mono text-lg uppercase"
-            />
-            <Button className="w-full" onClick={handleAccessCode}>Connect</Button>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 space-y-6">
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-foreground">Staff Scanner</h2>
+            <p className="text-sm text-muted-foreground mt-1">Enter your event access code</p>
+          </div>
+          <Input
+            placeholder="ACCESS CODE"
+            value={accessCode}
+            onChange={(e) => setAccessCode(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAccessCode()}
+            className="text-center font-mono text-lg uppercase bg-secondary border-border tracking-widest"
+          />
+          <Button className="w-full font-mono uppercase tracking-wider" onClick={handleAccessCode}>
+            Connect
+          </Button>
+        </div>
       </div>
     );
   }
 
-  // Step 2: Set event location
+  // Step 2: Set location
   if (!eventLocation) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <div className="w-full max-w-md space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" /> Set Event Location
-              </CardTitle>
-              <CardDescription>
-                Set your current GPS position for <strong>{event.name}</strong>. Students whose phones are 500+ feet from here earn: <strong>{event.coupon_reward}</strong>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-xs text-muted-foreground">
-                ⚠️ On iPhone, make sure Safari has location access: Settings → Privacy → Location Services → Safari → "While Using"
-              </p>
-              <Button className="w-full" onClick={setCurrentLocation} disabled={settingLocation}>
-                {settingLocation ? "Getting location..." : "Use My Current Location"}
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Set Event Location</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Set GPS for <span className="text-primary font-semibold">{event.name}</span>. Students 500+ feet away earn: <span className="text-primary">{event.coupon_reward}</span>
+            </p>
+            <p className="text-xs font-mono text-muted-foreground/70">
+              iPhone: Settings → Privacy → Location Services → Safari → "While Using"
+            </p>
+            <Button className="w-full font-mono uppercase tracking-wider" onClick={setCurrentLocation} disabled={settingLocation}>
+              {settingLocation ? "Getting location..." : "Use Current Location"}
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -338,41 +326,37 @@ const ScanPage = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background p-4">
       <div className="mx-auto w-full max-w-md space-y-4">
-        {/* Camera scanner at top */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-center">{event.name}</CardTitle>
-            <CardDescription className="text-center">Scan student ID barcode</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="relative overflow-hidden rounded-lg">
-              <div id="barcode-reader" ref={scannerRef} />
-              {scanFlash && (
-                <div
-                  className={`absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-300 ${
-                    scanFlash === "green"
-                      ? "bg-green-500/30 border-4 border-green-500"
-                      : "bg-red-500/30 border-4 border-red-500"
-                  } rounded-lg`}
-                >
-                  <span className="text-5xl">{scanFlash === "green" ? "✅" : "❌"}</span>
-                </div>
-              )}
-            </div>
-            <p className="text-center text-xs text-muted-foreground">{scanHint}</p>
-            {!scanning ? (
-              <Button className="w-full" onClick={startScanner}>
-                <Camera className="mr-2 h-4 w-4" /> Start Camera Scanner
-              </Button>
-            ) : (
-              <Button className="w-full" variant="destructive" onClick={stopScanner}>
-                Stop Scanner
-              </Button>
+        {/* Scanner */}
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-primary">{event.name}</h2>
+            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Scan Student ID</p>
+          </div>
+          <div className="relative overflow-hidden rounded-lg border border-border">
+            <div id="barcode-reader" ref={scannerRef} />
+            {scanFlash && (
+              <div className={`absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-300 rounded-lg ${
+                scanFlash === "green"
+                  ? "bg-primary/20 border-2 border-primary"
+                  : "bg-destructive/20 border-2 border-destructive"
+              }`}>
+                <span className="text-5xl">{scanFlash === "green" ? "✅" : "❌"}</span>
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-center text-xs font-mono text-muted-foreground">{scanHint}</p>
+          {!scanning ? (
+            <Button className="w-full font-mono uppercase tracking-wider gap-2" onClick={startScanner}>
+              <Camera className="h-4 w-4" /> Start Scanner
+            </Button>
+          ) : (
+            <Button className="w-full font-mono uppercase tracking-wider" variant="destructive" onClick={stopScanner}>
+              Stop Scanner
+            </Button>
+          )}
+        </div>
 
-        {/* Scan result */}
+        {/* Result */}
         {scanResult.status === "away" && (
           <CouponPrint
             studentName={scanResult.studentName!}
@@ -386,82 +370,70 @@ const ScanPage = () => {
         )}
 
         {scanResult.status === "nearby" && (
-          <Card className="border-destructive">
-            <CardContent className="pt-6 text-center">
-              <p className="text-3xl">❌</p>
-              <p className="mt-2 text-lg font-semibold">Phone is nearby</p>
-              <p className="text-sm text-muted-foreground">
-                {scanResult.studentName}'s phone is only {scanResult.distance} feet away. No coupon issued.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-destructive/50 bg-card p-6 text-center space-y-2">
+            <p className="text-3xl">❌</p>
+            <p className="text-lg font-bold text-foreground">Phone is Nearby</p>
+            <p className="text-sm text-muted-foreground">
+              {scanResult.studentName}'s phone is only <span className="text-destructive font-mono">{scanResult.distance} ft</span> away.
+            </p>
+          </div>
         )}
 
         {scanResult.status === "unavailable" && (
-          <Card className="border-destructive/50">
-            <CardContent className="pt-6 text-center">
-              <p className="text-3xl">⚠️</p>
-              <p className="mt-2 text-lg font-semibold">Location unavailable</p>
-              <p className="text-sm text-muted-foreground">
-                {scanResult.studentName}'s app isn't sharing location. Ask them to open the app and enable location sharing.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-border bg-card p-6 text-center space-y-2">
+            <p className="text-3xl">⚠️</p>
+            <p className="text-lg font-bold text-foreground">Location Unavailable</p>
+            <p className="text-sm text-muted-foreground">
+              {scanResult.studentName}'s app isn't sharing location.
+            </p>
+          </div>
         )}
 
-        {/* Stats tally */}
+        {/* Stats */}
         <div className="grid grid-cols-2 gap-3">
-          <Card>
-            <CardContent className="pt-4 pb-4 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
-                <Users className="h-4 w-4" />
-                <span className="text-xs">Students Scanned</span>
-              </div>
-              <p className="text-3xl font-bold text-foreground">{totalScans}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 pb-4 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
-                <Smartphone className="h-4 w-4" />
-                <span className="text-xs">Phone-less ✅</span>
-              </div>
-              <p className="text-3xl font-bold text-foreground">{phonelessCount}</p>
-            </CardContent>
-          </Card>
+          <div className="rounded-xl border border-border bg-card p-4 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
+              <Users className="h-4 w-4" />
+              <span className="text-xs font-mono uppercase">Scanned</span>
+            </div>
+            <p className="text-3xl font-bold text-primary font-mono">{totalScans}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-4 text-center">
+            <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
+              <Smartphone className="h-4 w-4" />
+              <span className="text-xs font-mono uppercase">Phone-less</span>
+            </div>
+            <p className="text-3xl font-bold text-primary font-mono">{phonelessCount}</p>
+          </div>
         </div>
 
         {/* Manual entry */}
-        <Card>
-          <CardContent className="pt-4 pb-4 space-y-3">
-            {!showManualEntry ? (
-              <Button variant="outline" className="w-full gap-2" onClick={() => setShowManualEntry(true)}>
-                <Hash className="h-4 w-4" /> Manual ID Entry
-              </Button>
-            ) : (
-              <>
-                <Label className="text-xs text-muted-foreground">Type student ID number</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="e.g. 920145678"
-                    value={manualBarcode}
-                    onChange={(e) => setManualBarcode(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && checkStudent(manualBarcode)}
-                    className="font-mono"
-                  />
-                  <Button onClick={() => checkStudent(manualBarcode)}>Check</Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          {!showManualEntry ? (
+            <Button variant="outline" className="w-full gap-2 font-mono uppercase tracking-wider" onClick={() => setShowManualEntry(true)}>
+              <Hash className="h-4 w-4" /> Manual ID Entry
+            </Button>
+          ) : (
+            <>
+              <Label className="text-xs font-mono uppercase text-muted-foreground">Student ID Number</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. 920145678"
+                  value={manualBarcode}
+                  onChange={(e) => setManualBarcode(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && checkStudent(manualBarcode)}
+                  className="font-mono bg-secondary border-border"
+                />
+                <Button onClick={() => checkStudent(manualBarcode)} className="font-mono uppercase">Check</Button>
+              </div>
+            </>
+          )}
+        </div>
 
-        {/* Location info */}
-        <p className="text-xs text-muted-foreground text-center">
-          📍 ({eventLocation.latitude.toFixed(4)}, {eventLocation.longitude.toFixed(4)})
-          <Button variant="link" className="ml-1 h-auto p-0 text-xs" onClick={() => setEventLocation(null)}>
-            Change
-          </Button>
+        {/* Location */}
+        <p className="text-xs font-mono text-muted-foreground/50 text-center">
+          📍 {eventLocation.latitude.toFixed(4)}, {eventLocation.longitude.toFixed(4)}
+          <button className="ml-2 text-primary hover:underline" onClick={() => setEventLocation(null)}>Change</button>
         </p>
       </div>
     </div>

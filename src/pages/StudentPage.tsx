@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, CalendarDays } from "lucide-react";
+import { ArrowLeft, MapPin, CalendarDays, Zap } from "lucide-react";
 
 const StudentPage = () => {
   const navigate = useNavigate();
@@ -30,7 +29,6 @@ const StudentPage = () => {
     }
   }, []);
 
-  // Fetch events attended via coupons (each coupon links to an event)
   useEffect(() => {
     if (!student) return;
     const fetchEvents = async () => {
@@ -45,7 +43,6 @@ const StudentPage = () => {
         return;
       }
 
-      // Fetch event details for each coupon
       const eventIds = [...new Set(coupons.map((c) => c.event_id).filter(Boolean))];
       const { data: events } = await supabase
         .from("events")
@@ -82,7 +79,7 @@ const StudentPage = () => {
         { onConflict: "student_id" }
       );
     } catch {
-      toast.error("Could not get location. Please enable GPS in your browser settings.");
+      toast.error("Could not get location. Please enable GPS.");
       setLocationSharing(false);
     }
   }, [student, locationSharing]);
@@ -125,102 +122,96 @@ const StudentPage = () => {
 
   if (!student) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <div className="w-full max-w-md space-y-6">
-          <Button variant="ghost" onClick={() => navigate("/")} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Button>
-          <Card>
-            <CardHeader>
-              <CardTitle>Student Registration</CardTitle>
-              <CardDescription>Enter your name and student ID barcode number</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <button onClick={() => navigate("/")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors font-mono">
+            <ArrowLeft className="h-4 w-4" /> BACK
+          </button>
+          <div className="rounded-xl border border-border bg-card p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Student Registration</h2>
+              <p className="text-sm text-muted-foreground mt-1">Enter your name and student ID barcode number</p>
+            </div>
+            <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Full Name</Label>
-                <Input placeholder="Jane Doe" value={name} onChange={(e) => setName(e.target.value)} />
+                <Label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Full Name</Label>
+                <Input placeholder="Jane Doe" value={name} onChange={(e) => setName(e.target.value)} className="bg-secondary border-border" />
               </div>
               <div className="space-y-2">
-                <Label>Student ID (Barcode Number)</Label>
-                <Input placeholder="e.g. 123456789" value={barcodeId} onChange={(e) => setBarcodeId(e.target.value)} />
+                <Label className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Student ID</Label>
+                <Input placeholder="e.g. 123456789" value={barcodeId} onChange={(e) => setBarcodeId(e.target.value)} className="bg-secondary border-border font-mono" />
               </div>
-              <Button className="w-full" onClick={handleRegister} disabled={registering}>
+              <Button className="w-full font-mono uppercase tracking-wider" onClick={handleRegister} disabled={registering}>
                 {registering ? "Registering..." : "Register"}
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background p-4">
+    <div className="flex min-h-screen flex-col bg-background p-6">
       <div className="mx-auto w-full max-w-md space-y-6">
-        <Button variant="ghost" onClick={() => navigate("/")} className="gap-1">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Button>
+        <button onClick={() => navigate("/")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors font-mono">
+          <ArrowLeft className="h-4 w-4" /> BACK
+        </button>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              {student.name}
-              <Badge variant={locationSharing ? "default" : "secondary"}>
-                {locationSharing ? "Active" : "Inactive"}
-              </Badge>
-            </CardTitle>
-            <CardDescription>ID: {student.barcode_id}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-muted-foreground" />
-                <Label htmlFor="location-toggle">Share Location</Label>
-              </div>
-              <Switch
-                id="location-toggle"
-                checked={locationSharing}
-                onCheckedChange={setLocationSharing}
-              />
+        {/* Profile card */}
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">{student.name}</h2>
+              <p className="text-sm font-mono text-muted-foreground">ID: {student.barcode_id}</p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Keep this page open and location sharing on during the event. Your phone's location will be checked when your ID is scanned.
-            </p>
-          </CardContent>
-        </Card>
+            <Badge variant={locationSharing ? "default" : "secondary"} className="font-mono text-xs uppercase">
+              {locationSharing ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-border bg-secondary p-4">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              <Label htmlFor="location-toggle" className="text-sm">Share Location</Label>
+            </div>
+            <Switch id="location-toggle" checked={locationSharing} onCheckedChange={setLocationSharing} />
+          </div>
+          <p className="text-xs text-muted-foreground font-mono">
+            Keep this page open during the event. Your location is checked when your ID is scanned.
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CalendarDays className="h-5 w-5" /> Events Attended
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {eventsAttended.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No events yet. Put your phone away at an event to earn snacks!</p>
-            ) : (
-              <div className="space-y-3">
-                {eventsAttended.map((e, i) => (
-                  <div key={i} className="rounded-lg border p-3 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-sm text-foreground">{e.event_name}</p>
-                      <Badge variant={e.redeemed ? "secondary" : "default"}>
-                        {e.redeemed ? "Redeemed" : "Valid"}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">🎁 {e.coupon_reward}</p>
-                    <div className="flex items-center justify-between">
-                      <p className="font-mono text-xs text-muted-foreground">{e.coupon_code}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(e.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
+        {/* Events */}
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-bold text-foreground">Events Attended</h3>
+          </div>
+          {eventsAttended.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No events yet. Put your phone away to earn snacks!</p>
+          ) : (
+            <div className="space-y-3">
+              {eventsAttended.map((e, i) => (
+                <div key={i} className="rounded-lg border border-border bg-secondary p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-sm text-foreground">{e.event_name}</p>
+                    <Badge variant={e.redeemed ? "secondary" : "default"} className="font-mono text-xs">
+                      {e.redeemed ? "Redeemed" : "Valid"}
+                    </Badge>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="h-3 w-3 text-primary" />
+                    <p className="text-xs text-muted-foreground">{e.coupon_reward}</p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="font-mono text-xs text-muted-foreground">{e.coupon_code}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(e.created_at).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
