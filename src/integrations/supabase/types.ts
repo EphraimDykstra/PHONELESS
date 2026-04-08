@@ -161,6 +161,30 @@ export type Database = {
           },
         ]
       }
+      student_location_history: {
+        Row: {
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          student_id?: string
+        }
+        Relationships: []
+      }
       student_locations: {
         Row: {
           id: string

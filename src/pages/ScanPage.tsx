@@ -37,6 +37,8 @@ const ScanPage = () => {
     studentName?: string;
     distance?: number;
     couponCode?: string;
+    trackingMinutes?: number;
+    historyPings?: number;
   }>({ status: null });
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<any>(null);
@@ -149,6 +151,22 @@ const ScanPage = () => {
       .eq("student_id", student.id)
       .single();
 
+    // Check location history for tracking duration
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: history } = await supabase
+      .from("student_location_history")
+      .select("created_at")
+      .eq("student_id", student.id)
+      .gte("created_at", thirtyMinAgo)
+      .order("created_at", { ascending: true });
+
+    let trackingMinutes = 0;
+    if (history && history.length > 0) {
+      const earliest = new Date(history[0].created_at).getTime();
+      const latest = new Date(history[history.length - 1].created_at).getTime();
+      trackingMinutes = Math.round((latest - earliest) / 60000);
+    }
+
     let result: "away" | "nearby" | "unavailable";
     let distance: number | undefined;
 
@@ -180,11 +198,11 @@ const ScanPage = () => {
         coupon_code: couponCode,
         event_id: event.id,
       });
-      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode });
+      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode, trackingMinutes, historyPings: history?.length || 0 });
     } else if (result === "nearby") {
-      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!) });
+      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!), trackingMinutes, historyPings: history?.length || 0 });
     } else {
-      setScanResult({ status: "unavailable", studentName: student.name });
+      setScanResult({ status: "unavailable", studentName: student.name, trackingMinutes: 0, historyPings: 0 });
     }
 
     setManualBarcode("");
@@ -367,6 +385,15 @@ const ScanPage = () => {
           )}
         </div>
 
+        {/* Tracking info */}
+        {scanResult.status && scanResult.status !== "unavailable" && (
+          <div className="rounded-lg border border-border bg-secondary/50 p-3 text-center">
+            <p className="text-xs font-mono text-muted-foreground">
+              📍 Tracked for <span className="text-primary font-semibold">{scanResult.trackingMinutes || 0} min</span> · <span className="text-primary font-semibold">{scanResult.historyPings || 0}</span> location pings in last 30 min
+            </p>
+          </div>
+        )}
+
         {/* Result */}
         {scanResult.status === "away" && (
           <CouponPrint
@@ -400,7 +427,6 @@ const ScanPage = () => {
           </div>
         )}
 
-        {/* Stats */}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-border bg-card p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
