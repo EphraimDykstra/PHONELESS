@@ -168,17 +168,25 @@ const ScanPage = () => {
       trackingMinutes = Math.round((latest - earliest) / 60000);
     }
 
-    let result: "away" | "nearby" | "unavailable";
+    const FRESHNESS_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+    let result: "away" | "nearby" | "unavailable" | "stale";
     let distance: number | undefined;
+    let lastPingAge = 0;
 
     if (!loc) {
       result = "unavailable";
     } else {
-      distance = calculateDistanceFeet(
-        eventLocation.latitude, eventLocation.longitude,
-        loc.latitude, loc.longitude
-      );
-      result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
+      // Check how fresh the location is
+      lastPingAge = Date.now() - new Date(loc.updated_at).getTime();
+      if (lastPingAge > FRESHNESS_THRESHOLD_MS) {
+        result = "stale";
+      } else {
+        distance = calculateDistanceFeet(
+          eventLocation.latitude, eventLocation.longitude,
+          loc.latitude, loc.longitude
+        );
+        result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
+      }
     }
 
     setScanFlash(result === "away" ? "green" : "red");
@@ -192,6 +200,8 @@ const ScanPage = () => {
       distance_feet: distance ? Math.round(distance) : null,
     });
 
+    const lastPingMinutes = Math.round(lastPingAge / 60000);
+
     if (result === "away") {
       const couponCode = generateCouponCode();
       await supabase.from("coupons").insert({
@@ -199,9 +209,11 @@ const ScanPage = () => {
         coupon_code: couponCode,
         event_id: event.id,
       });
-      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode, trackingMinutes, historyPings: history?.length || 0 });
+      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode, trackingMinutes, historyPings: history?.length || 0, lastPingAge: lastPingMinutes });
     } else if (result === "nearby") {
-      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!), trackingMinutes, historyPings: history?.length || 0 });
+      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!), trackingMinutes, historyPings: history?.length || 0, lastPingAge: lastPingMinutes });
+    } else if (result === "stale") {
+      setScanResult({ status: "stale", studentName: student.name, trackingMinutes, historyPings: history?.length || 0, lastPingAge: lastPingMinutes });
     } else {
       setScanResult({ status: "unavailable", studentName: student.name, trackingMinutes: 0, historyPings: 0 });
     }
