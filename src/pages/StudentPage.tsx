@@ -74,10 +74,17 @@ const StudentPage = () => {
         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true })
       );
       const { latitude, longitude } = pos.coords;
+      // Update current location
       await supabase.from("student_locations").upsert(
         { student_id: student.id, latitude, longitude },
         { onConflict: "student_id" }
       );
+      // Log to location history
+      await supabase.from("student_location_history").insert({
+        student_id: student.id,
+        latitude,
+        longitude,
+      });
     } catch {
       toast.error("Could not get location. Please enable GPS.");
       setLocationSharing(false);

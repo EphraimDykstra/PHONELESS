@@ -149,6 +149,22 @@ const ScanPage = () => {
       .eq("student_id", student.id)
       .single();
 
+    // Check location history for tracking duration
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: history } = await supabase
+      .from("student_location_history")
+      .select("created_at")
+      .eq("student_id", student.id)
+      .gte("created_at", thirtyMinAgo)
+      .order("created_at", { ascending: true });
+
+    let trackingMinutes = 0;
+    if (history && history.length > 0) {
+      const earliest = new Date(history[0].created_at).getTime();
+      const latest = new Date(history[history.length - 1].created_at).getTime();
+      trackingMinutes = Math.round((latest - earliest) / 60000);
+    }
+
     let result: "away" | "nearby" | "unavailable";
     let distance: number | undefined;
 
@@ -180,11 +196,11 @@ const ScanPage = () => {
         coupon_code: couponCode,
         event_id: event.id,
       });
-      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode });
+      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode, trackingMinutes, historyPings: history?.length || 0 });
     } else if (result === "nearby") {
-      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!) });
+      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!), trackingMinutes, historyPings: history?.length || 0 });
     } else {
-      setScanResult({ status: "unavailable", studentName: student.name });
+      setScanResult({ status: "unavailable", studentName: student.name, trackingMinutes: 0, historyPings: 0 });
     }
 
     setManualBarcode("");
