@@ -417,7 +417,16 @@ const ScanPage = () => {
           </div>
         )}
 
-        {/* Stats */}
+        {scanResult.status === "unavailable" && (
+          <div className="rounded-xl border border-border bg-card p-6 text-center space-y-2">
+            <p className="text-3xl">⚠️</p>
+            <p className="text-lg font-bold text-foreground">Location Unavailable</p>
+            <p className="text-sm text-muted-foreground">
+              {scanResult.studentName}'s app isn't sharing location.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-border bg-card p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
