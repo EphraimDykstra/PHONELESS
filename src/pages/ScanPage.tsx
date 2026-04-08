@@ -385,6 +385,15 @@ const ScanPage = () => {
           )}
         </div>
 
+        {/* Tracking info */}
+        {scanResult.status && scanResult.status !== "unavailable" && (
+          <div className="rounded-lg border border-border bg-secondary/50 p-3 text-center">
+            <p className="text-xs font-mono text-muted-foreground">
+              📍 Tracked for <span className="text-primary font-semibold">{scanResult.trackingMinutes || 0} min</span> · <span className="text-primary font-semibold">{scanResult.historyPings || 0}</span> location pings in last 30 min
+            </p>
+          </div>
+        )}
+
         {/* Result */}
         {scanResult.status === "away" && (
           <CouponPrint
@@ -404,16 +413,6 @@ const ScanPage = () => {
             <p className="text-lg font-bold text-foreground">Phone is Nearby</p>
             <p className="text-sm text-muted-foreground">
               {scanResult.studentName}'s phone is only <span className="text-destructive font-mono">{scanResult.distance} ft</span> away.
-            </p>
-          </div>
-        )}
-
-        {scanResult.status === "unavailable" && (
-          <div className="rounded-xl border border-border bg-card p-6 text-center space-y-2">
-            <p className="text-3xl">⚠️</p>
-            <p className="text-lg font-bold text-foreground">Location Unavailable</p>
-            <p className="text-sm text-muted-foreground">
-              {scanResult.studentName}'s app isn't sharing location.
             </p>
           </div>
         )}
