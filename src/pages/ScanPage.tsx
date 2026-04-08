@@ -214,50 +214,48 @@ const ScanPage = () => {
           Html5QrcodeSupportedFormats.CODABAR,
         ],
         useBarCodeDetectorIfSupported: true,
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
         verbose: false,
       } as any);
 
       html5QrCodeRef.current = scanner;
+
+      let processingRef = false;
+
       await scanner.start(
-        { facingMode: { ideal: "environment" } },
+        { facingMode: "environment" },
         {
-          fps: 20,
-          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
-            width: Math.max(Math.floor(viewfinderWidth * 0.94), 280),
-            height: Math.max(Math.floor(viewfinderHeight * 0.22), 90),
-          }),
-          aspectRatio: 1.777,
+          fps: 15,
+          qrbox: { width: 280, height: 80 },
+          aspectRatio: 3.0,
           disableFlip: false,
-          videoConstraints: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
         },
         async (decodedText: string) => {
+          if (processingRef) return;
+          processingRef = true;
           setScanHint(`Barcode detected: ${decodedText}`);
-          await scanner.stop();
+          try {
+            await scanner.stop();
+          } catch {}
           setScanning(false);
           await checkStudentRef.current?.(decodedText);
         },
         () => {}
       );
 
-      setScanHint("Hold the full barcode horizontally inside the frame");
+      setScanHint("Hold the barcode inside the frame");
 
       try {
-        const capabilities = scanner.getRunningTrackCapabilities() as MediaTrackCapabilities & {
-          zoom?: { max?: number };
-          torch?: boolean;
-        };
-        const constraints = {
-          advanced: [
-            capabilities.zoom ? ({ zoom: Math.min(2, capabilities.zoom.max || 2) } as unknown as MediaTrackConstraintSet) : {},
-            capabilities.torch ? ({ torch: false } as unknown as MediaTrackConstraintSet) : {},
-          ],
-        } as MediaTrackConstraints;
-        await scanner.applyVideoConstraints(constraints);
+        const track = scanner.getRunningTrackCameraCapabilities?.();
+        if (track) {
+          const zoomCap = (track as any).zoomFeature?.();
+          if (zoomCap?.isSupported?.()) {
+            await zoomCap.apply(Math.min(2, zoomCap.max()));
+          }
+          const focusCap = (track as any).focusModeFeature?.();
+          if (focusCap?.isSupported?.()) {
+            await focusCap.apply("continuous");
+          }
+        }
       } catch {}
     } catch {
       toast.error("Camera access denied or barcode reader failed to start.");
@@ -332,8 +330,8 @@ const ScanPage = () => {
             <h2 className="text-lg font-bold text-primary">{event.name}</h2>
             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Scan Student ID</p>
           </div>
-          <div className="relative overflow-hidden rounded-lg border border-border">
-            <div id="barcode-reader" ref={scannerRef} />
+          <div className="relative overflow-hidden rounded-lg border border-border" style={{ maxHeight: 180 }}>
+            <div id="barcode-reader" ref={scannerRef} style={{ maxHeight: 180 }} />
             {scanFlash && (
               <div className={`absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-300 rounded-lg ${
                 scanFlash === "green"
