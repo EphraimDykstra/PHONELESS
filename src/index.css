@@ -68,6 +68,35 @@
   }
 }
 
+@layer components {
+  #barcode-reader {
+    width: 100%;
+    min-height: 180px;
+    background: hsl(var(--secondary) / 0.35);
+    border-radius: calc(var(--radius) - 0.125rem);
+  }
+
+  #barcode-reader > div {
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  #barcode-reader video {
+    width: 100% !important;
+    height: 180px !important;
+    object-fit: cover;
+    border-radius: calc(var(--radius) - 0.125rem);
+  }
+
+  #barcode-reader__scan_region {
+    min-height: 180px;
+  }
+
+  #barcode-reader #qr-shaded-region {
+    display: none !important;
+  }
+}
+
 @layer utilities {
   .text-glow {
     text-shadow: 0 0 20px hsl(68 100% 50% / 0.4), 0 0 40px hsl(68 100% 50% / 0.2);
