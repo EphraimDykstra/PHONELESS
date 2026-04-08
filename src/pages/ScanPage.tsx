@@ -37,6 +37,8 @@ const ScanPage = () => {
     studentName?: string;
     distance?: number;
     couponCode?: string;
+    trackingMinutes?: number;
+    historyPings?: number;
   }>({ status: null });
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<any>(null);
