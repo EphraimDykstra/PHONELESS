@@ -33,12 +33,13 @@ const ScanPage = () => {
   const [scanFlash, setScanFlash] = useState<"green" | "red" | null>(null);
   const [scanHint, setScanHint] = useState("Align the full barcode inside the frame");
   const [scanResult, setScanResult] = useState<{
-    status: "away" | "nearby" | "unavailable" | null;
+    status: "away" | "nearby" | "unavailable" | "stale" | null;
     studentName?: string;
     distance?: number;
     couponCode?: string;
     trackingMinutes?: number;
     historyPings?: number;
+    lastPingAge?: number;
   }>({ status: null });
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<any>(null);
@@ -167,17 +168,25 @@ const ScanPage = () => {
       trackingMinutes = Math.round((latest - earliest) / 60000);
     }
 
-    let result: "away" | "nearby" | "unavailable";
+    const FRESHNESS_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+    let result: "away" | "nearby" | "unavailable" | "stale";
     let distance: number | undefined;
+    let lastPingAge = 0;
 
     if (!loc) {
       result = "unavailable";
     } else {
-      distance = calculateDistanceFeet(
-        eventLocation.latitude, eventLocation.longitude,
-        loc.latitude, loc.longitude
-      );
-      result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
+      // Check how fresh the location is
+      lastPingAge = Date.now() - new Date(loc.updated_at).getTime();
+      if (lastPingAge > FRESHNESS_THRESHOLD_MS) {
+        result = "stale";
+      } else {
+        distance = calculateDistanceFeet(
+          eventLocation.latitude, eventLocation.longitude,
+          loc.latitude, loc.longitude
+        );
+        result = distance >= DISTANCE_THRESHOLD ? "away" : "nearby";
+      }
     }
 
     setScanFlash(result === "away" ? "green" : "red");
@@ -191,6 +200,8 @@ const ScanPage = () => {
       distance_feet: distance ? Math.round(distance) : null,
     });
 
+    const lastPingMinutes = Math.round(lastPingAge / 60000);
+
     if (result === "away") {
       const couponCode = generateCouponCode();
       await supabase.from("coupons").insert({
@@ -198,9 +209,11 @@ const ScanPage = () => {
         coupon_code: couponCode,
         event_id: event.id,
       });
-      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode, trackingMinutes, historyPings: history?.length || 0 });
+      setScanResult({ status: "away", studentName: student.name, distance: Math.round(distance!), couponCode, trackingMinutes, historyPings: history?.length || 0, lastPingAge: lastPingMinutes });
     } else if (result === "nearby") {
-      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!), trackingMinutes, historyPings: history?.length || 0 });
+      setScanResult({ status: "nearby", studentName: student.name, distance: Math.round(distance!), trackingMinutes, historyPings: history?.length || 0, lastPingAge: lastPingMinutes });
+    } else if (result === "stale") {
+      setScanResult({ status: "stale", studentName: student.name, trackingMinutes, historyPings: history?.length || 0, lastPingAge: lastPingMinutes });
     } else {
       setScanResult({ status: "unavailable", studentName: student.name, trackingMinutes: 0, historyPings: 0 });
     }
@@ -423,6 +436,16 @@ const ScanPage = () => {
             <p className="text-lg font-bold text-foreground">Location Unavailable</p>
             <p className="text-sm text-muted-foreground">
               {scanResult.studentName}'s app isn't sharing location.
+            </p>
+          </div>
+        )}
+
+        {scanResult.status === "stale" && (
+          <div className="rounded-xl border border-yellow-500/50 bg-card p-6 text-center space-y-2">
+            <p className="text-3xl">📵</p>
+            <p className="text-lg font-bold text-foreground">Location Stale</p>
+            <p className="text-sm text-muted-foreground">
+              {scanResult.studentName}'s last ping was <span className="text-yellow-500 font-mono">{scanResult.lastPingAge} min ago</span>. Their app may be closed — no coupon issued.
             </p>
           </div>
         )}
