@@ -440,6 +440,16 @@ const ScanPage = () => {
           </div>
         )}
 
+        {scanResult.status === "stale" && (
+          <div className="rounded-xl border border-yellow-500/50 bg-card p-6 text-center space-y-2">
+            <p className="text-3xl">📵</p>
+            <p className="text-lg font-bold text-foreground">Location Stale</p>
+            <p className="text-sm text-muted-foreground">
+              {scanResult.studentName}'s last ping was <span className="text-yellow-500 font-mono">{scanResult.lastPingAge} min ago</span>. Their app may be closed — no coupon issued.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-border bg-card p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">
