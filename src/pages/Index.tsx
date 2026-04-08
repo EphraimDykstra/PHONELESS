@@ -38,7 +38,7 @@ const Index = () => {
 
         {/* Footer */}
         <p className="text-center text-xs font-mono text-muted-foreground/50">
-          v1.0 · PHONE AWAY
+          v1.0 · PHONELESS
         </p>
       </div>
     </div>
