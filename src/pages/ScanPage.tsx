@@ -33,12 +33,13 @@ const ScanPage = () => {
   const [scanFlash, setScanFlash] = useState<"green" | "red" | null>(null);
   const [scanHint, setScanHint] = useState("Align the full barcode inside the frame");
   const [scanResult, setScanResult] = useState<{
-    status: "away" | "nearby" | "unavailable" | null;
+    status: "away" | "nearby" | "unavailable" | "stale" | null;
     studentName?: string;
     distance?: number;
     couponCode?: string;
     trackingMinutes?: number;
     historyPings?: number;
+    lastPingAge?: number;
   }>({ status: null });
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrCodeRef = useRef<any>(null);
