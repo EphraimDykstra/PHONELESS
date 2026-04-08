@@ -10,7 +10,7 @@ const Index = () => {
         {/* Hero */}
         <div className="space-y-4 text-center">
           <h1 className="text-5xl font-extrabold tracking-tight text-primary text-glow">
-            PHONE<br />AWAY
+            PHONELESS
           </h1>
           <p className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
             Put your phone away. Earn a free snack.
